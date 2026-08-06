@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1b3e">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ゆわの物語">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>あなたの物語に、続きを。｜ゆわ Bloom Realm</title>
+<script src="html2canvas.min.js"></script>
+<style>
+  :root{
+    --ink:#2a3a63;          /* 深い藍 文字 */
+    --gold:#c8a24a;         /* 金 */
+    --gold-soft:#e6cf8f;
+    --mist:#eaf3f6;         /* ターコイズの霞 */
+    --page-max:480px;       /* 読み物の最大幅 */
+    --ui:#f7f3e8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:#0d1b3e;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #1c2f5e 0%, #0d1b3e 55%, #070f26 100%);
+    font-family:"Hiragino Mincho ProN","YuMincho","Yu Mincho",serif;
+    color:var(--ink);
+    overflow:hidden;
+    -webkit-text-size-adjust:100%;
+  }
+
+  /* ===== ステージ ===== */
+  #stage{
+    position:fixed;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    padding:0;
+  }
+  #book{
+    position:relative;
+    width:100%;
+    max-width:var(--page-max);
+    height:100%;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  .page{
+    position:absolute;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:100%;
+    max-width:var(--page-max);
+    max-height:100%;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .6s ease;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .page.active{opacity:1;pointer-events:auto;}
+  .page img.sheet{
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:100vh;
+    object-fit:contain;
+    user-select:none;-webkit-user-drag:none;
+  }
+
+  /* ワークページのラッパ：画像と入力欄を同座標で重ねる */
+  .worksheet{
+    position:relative;
+    width:100%;
+    max-width:var(--page-max);
+    max-height:100vh;
+  }
+  .worksheet img.sheet{max-height:100vh;}
+
+  /* モバイル：幅いっぱいで表示（絵は切らず、上下に少し余白） */
+  @media (max-width:520px){
+    .page{max-width:100vw;}
+    .worksheet{max-width:100vw;}
+    .page img.sheet{border-radius:0;box-shadow:none;}
+  }
+  .field{
+    position:absolute;
+    background:transparent;
+    border:none;
+    outline:none;
+    resize:none;
+    color:#25507a;
+    font-family:"Hiragino Mincho ProN","YuMincho",serif;
+    font-size:clamp(11px,3.2vw,15px);
+    line-height:1.9;
+    padding:2px 6px;
+    overflow:hidden;
+  }
+  .field::placeholder{color:rgba(90,140,175,.35);}
+  .field:focus{background:rgba(255,255,255,.28);border-radius:6px;}
+
+  /* ===== ナビ ===== */
+  .nav{
+    position:fixed;top:0;bottom:0;width:33%;
+    z-index:20;border:none;background:transparent;
+    cursor:pointer;
+  }
+  .nav.prev{left:0;}
+  .nav.next{right:0;}
+
+  .arrow{
+    position:fixed;top:50%;transform:translateY(-50%);
+    z-index:21;width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(13,27,62,.35);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    border:1px solid rgba(230,207,143,.5);
+    color:var(--gold-soft);font-size:20px;
+    transition:opacity .4s;pointer-events:auto;opacity:.4;
+  }
+  #book:hover ~ .arrow,.arrow.show{opacity:.9;}
+  .arrow.prev{left:12px;}
+  .arrow.next{right:12px;}
+  .arrow.hidden{opacity:0!important;}
+
+  /* ===== 進捗（星の粒） ===== */
+  #progress{
+    position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+    z-index:22;display:flex;gap:7px;align-items:center;
+    padding:7px 12px;border-radius:20px;
+    background:rgba(7,15,38,.4);backdrop-filter:blur(6px);
+  }
+  #progress .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:rgba(230,207,143,.3);transition:all .4s;
+  }
+  #progress .dot.on{background:var(--gold-soft);box-shadow:0 0 8px var(--gold-soft);transform:scale(1.35);}
+
+  /* ===== 音楽トグル ===== */
+  #sound{
+    position:fixed;top:14px;right:14px;z-index:25;
+    width:42px;height:42px;border-radius:50%;
+    background:rgba(7,15,38,.45);backdrop-filter:blur(6px);
+    border:1px solid rgba(230,207,143,.45);
+    color:var(--gold-soft);font-size:17px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+
+  /* ===== ワーク保存ボタン ===== */
+  #saveBar{
+    position:fixed;left:50%;bottom:52px;transform:translateX(-50%);
+    z-index:23;display:none;
+  }
+  #saveBar.show{display:block;}
+  #saveBtn{
+    font-family:"Hiragino Mincho ProN",serif;
+    font-size:14px;letter-spacing:.08em;
+    color:#3a2f10;
+    background:linear-gradient(180deg,#f3e2b0,#dcbf74);
+    border:1px solid #c8a24a;
+    padding:10px 22px;border-radius:24px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer;
+    display:flex;align-items:center;gap:7px;
+  }
+  #saveBtn:active{transform:translateY(1px);}
+
+  /* ===== 初回タップ（音を灯す）===== */
+  #firstTouch{
+    position:fixed;inset:0;z-index:60;cursor:pointer;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:14vh;transition:opacity .8s;
+    background:linear-gradient(to top,rgba(7,15,38,.35),rgba(7,15,38,0) 40%);
+  }
+  #firstTouch.hide{opacity:0;pointer-events:none;}
+  .ft-inner{
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    color:#f3ead2;letter-spacing:.22em;font-size:14px;
+    animation:breathe 2.8s ease-in-out infinite;
+  }
+  .ft-star{font-size:20px;color:var(--gold-soft);text-shadow:0 0 16px rgba(230,207,143,.7);}
+  .ft-text{text-shadow:0 2px 12px rgba(0,0,0,.6);}
+  @keyframes breathe{0%,100%{opacity:.55;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+  /* トースト */
+  #toast{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);
+    z-index:80;background:rgba(7,15,38,.9);color:#f3ead2;
+    padding:16px 26px;border-radius:14px;border:1px solid rgba(230,207,143,.4);
+    font-size:14px;letter-spacing:.06em;opacity:0;pointer-events:none;
+    transition:all .4s;text-align:center;line-height:1.7;max-width:80vw;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+
+  @media (prefers-reduced-motion:reduce){
+    .page{transition:opacity .2s;}
+    .twinkle{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="book"></div>
+</div>
+
+<button class="nav prev" id="navPrev" aria-label="前へ"></button>
+<button class="nav next" id="navNext" aria-label="次へ"></button>
+<div class="arrow prev" id="arrPrev">‹</div>
+<div class="arrow next" id="arrNext">›</div>
+
+<div id="progress"></div>
+<button id="sound" aria-label="音楽">♪</button>
+
+<div id="saveBar">
+  <button id="saveBtn"><span>✦</span> このページを画像で保存</button>
+</div>
+
+<!-- 初回タップで音を灯す（表紙の上にそっと重なる） -->
+<div id="firstTouch">
+  <div class="ft-inner">
+    <span class="ft-star">✦</span>
+    <span class="ft-text">ふれて、はじめる</span>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<audio id="bgm" src="bgm.m4a" loop preload="auto"></audio>
+
+<script>
+/* ===== ページ定義 ===== */
+const PAGES = [
+  {src:'01_cover.jpg'},
+  {src:'02.jpg'},
+  {src:'03.jpg'},
+  {src:'04.jpg'},
+  {src:'05.jpg'},
+  {src:'06.jpg'},
+  {src:'07.jpg'},
+  {src:'08.jpg'},
+  {src:'09.jpg'},
+  {src:'10_koe.jpg'},
+  {src:'11_thankyou.jpg'},
+  {src:'12_work.jpg', work:true},
+  {src:'13.jpg'},
+];
+
+/* ワーク入力欄：相対座標(0-1)。測定済み */
+const FIELDS = [
+  // 問1 横3枠
+  {x:.055,y:.315,w:.245,h:.095,ph:'　'},
+  {x:.315,y:.315,w:.265,h:.095,ph:'　'},
+  {x:.595,y:.315,w:.355,h:.095,ph:'　'},
+  // 問2 横3枠
+  {x:.055,y:.470,w:.245,h:.095,ph:'　'},
+  {x:.315,y:.470,w:.265,h:.095,ph:'　'},
+  {x:.595,y:.470,w:.355,h:.095,ph:'　'},
+  // 問3 横長
+  {x:.055,y:.620,w:.895,h:.085,ph:'　'},
+  // 問4 横長
+  {x:.055,y:.760,w:.895,h:.090,ph:'　'},
+];
+
+const book = document.getElementById('book');
+let idx = 0;
+const pageEls = [];
+
+PAGES.forEach((p,i)=>{
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.dataset.i = i;
+
+  if(p.work){
+    const ws = document.createElement('div');
+    ws.className = 'worksheet';
+    const img = document.createElement('img');
+    img.className = 'sheet'; img.src = p.src; img.alt='ワークシート';
+    ws.appendChild(img);
+    FIELDS.forEach((f,fi)=>{
+      const ta = document.createElement('textarea');
+      ta.className = 'field';
+      ta.style.left = (f.x*100)+'%';
+      ta.style.top = (f.y*100)+'%';
+      ta.style.width = (f.w*100)+'%';
+      ta.style.height = (f.h*100)+'%';
+      ta.setAttribute('rows','2');
+      ta.dataset.fi = fi;
+      ws.appendChild(ta);
+    });
+    page.appendChild(ws);
+    page._ws = ws;
+  }else{
+    const img = document.createElement('img');
+    img.className='sheet'; img.src=p.src; img.alt='ページ'+(i+1);
+    page.appendChild(img);
+  }
+  book.appendChild(page);
+  pageEls.push(page);
+});
+
+/* 進捗ドット */
+const prog = document.getElementById('progress');
+PAGES.forEach((_,i)=>{
+  const d = document.createElement('div');
+  d.className='dot'; prog.appendChild(d);
+});
+const dots = [...prog.children];
+
+function show(n){
+  n = Math.max(0, Math.min(PAGES.length-1, n));
+  pageEls[idx].classList.remove('active');
+  idx = n;
+  pageEls[idx].classList.add('active');
+  dots.forEach((d,i)=>d.classList.toggle('on', i===idx));
+  document.getElementById('arrPrev').classList.toggle('hidden', idx===0);
+  document.getElementById('arrNext').classList.toggle('hidden', idx===PAGES.length-1);
+  document.getElementById('saveBar').classList.toggle('show', !!PAGES[idx].work);
+  // ワークページ中はサイドの透明ナビを無効化（入力欄タップ優先）
+  const isWork = !!PAGES[idx].work;
+  document.getElementById('navPrev').style.display = isWork ? 'none' : 'block';
+  document.getElementById('navNext').style.display = isWork ? 'none' : 'block';
+  // ワーク中は矢印を常時表示（めくる手段を明示）
+  document.getElementById('arrPrev').classList.toggle('show', isWork && idx>0);
+  document.getElementById('arrNext').classList.toggle('show', isWork && idx<PAGES.length-1);
+}
+function next(){ show(idx+1); }
+function prev(){ show(idx-1); }
+
+document.getElementById('navNext').onclick = next;
+document.getElementById('navPrev').onclick = prev;
+document.getElementById('arrNext').onclick = next;
+document.getElementById('arrPrev').onclick = prev;
+
+/* キーボード */
+document.addEventListener('keydown',e=>{
+  if(e.target.classList.contains('field')) return;
+  if(e.key==='ArrowRight') next();
+  if(e.key==='ArrowLeft') prev();
+});
+
+/* スワイプ */
+let tx=0,ty=0;
+book.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+book.addEventListener('touchend',e=>{
+  if(e.target.classList.contains('field')) return;
+  const dx=e.changedTouches[0].clientX-tx;
+  const dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)){
+    dx<0 ? next() : prev();
+  }
+},{passive:true});
+
+/* ===== BGM ===== */
+const bgm = document.getElementById('bgm');
+const soundBtn = document.getElementById('sound');
+let playing = false;
+function setSound(on){
+  playing = on;
+  soundBtn.textContent = on ? '♪' : '♪̶';
+  soundBtn.style.opacity = on ? '1' : '.5';
+  if(on){ bgm.volume=.0; bgm.play().then(fadeIn).catch(()=>{}); }
+  else{ bgm.pause(); }
+}
+function fadeIn(){
+  let v=0; const t=setInterval(()=>{v+=.05; bgm.volume=Math.min(v,.55); if(v>=.55)clearInterval(t);},80);
+}
+soundBtn.onclick = ()=>setSound(!playing);
+
+/* ===== 初回タップで音を灯す（表紙はもう見えている）===== */
+const firstTouch = document.getElementById('firstTouch');
+firstTouch.addEventListener('click', ()=>{
+  firstTouch.classList.add('hide');
+  setSound(true);
+  setTimeout(()=>firstTouch.style.display='none',800);
+});
+
+/* ===== 画像で保存 ===== */
+const toast = document.getElementById('toast');
+function showToast(msg,ms=2600){
+  toast.innerHTML=msg; toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),ms);
+}
+
+document.getElementById('saveBtn').onclick = async ()=>{
+  const ws = pageEls[idx]._ws;
+  if(!ws) return;
+  showToast('星に描いています…');
+  // フォーカス解除して枠のハイライトを消す
+  document.querySelectorAll('.field').forEach(f=>f.blur());
+  await new Promise(r=>setTimeout(r,120));
+  try{
+    const canvas = await html2canvas(ws,{
+      backgroundColor:null,
+      scale:2,
+      useCORS:true,
+      logging:false,
+    });
+    const url = canvas.toDataURL('image/png');
+    // iOS: 新規タブで開いて長押し保存 / その他: ダウンロード
+    const a = document.createElement('a');
+    a.href=url; a.download='わたしの物語_ワーク.png';
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+    if(isIOS){
+      const w = window.open();
+      if(w){ w.document.write('<img src="'+url+'" style="width:100%">'); w.document.title='長押しで保存'; }
+      showToast('画像を長押しして<br>「写真に保存」を選んでね');
+    }else{
+      a.click();
+      showToast('保存しました ✦');
+    }
+  }catch(err){
+    showToast('保存できませんでした。<br>もう一度お試しください');
+    console.error(err);
+  }
+};
+
+/* 起動時：表紙を表示（音は初回タップで灯る）*/
+show(0);
+</script>
+</body>
+</html>
