@@ -282,6 +282,21 @@
     border:1px solid rgba(230,207,143,.5);
     padding:10px 30px;border-radius:22px;cursor:pointer;
   }
+
+  #restartBar{
+    position:fixed;left:50%;bottom:30px;transform:translateX(-50%);
+    z-index:23;display:none;
+  }
+  #restartBar.show{display:block;}
+  #restartBtn{
+    font-family:"Hiragino Mincho ProN",serif;
+    font-size:14px;letter-spacing:.1em;color:#3a2f10;
+    background:linear-gradient(180deg,#f3e2b0,#dcbf74);
+    border:1px solid #c8a24a;
+    padding:11px 30px;border-radius:24px;cursor:pointer;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);
+  }
+  #restartBtn:active{transform:translateY(1px);}
 </style>
 </head>
 <body>
@@ -295,6 +310,7 @@
 <div class="arrow prev" id="arrPrev">‹</div>
 <div class="arrow next" id="arrNext">›</div>
 
+<div id="restartBar"><button id="restartBtn">✦ 最初にもどる</button></div>
 <div id="progress"></div>
 <button id="sound" aria-label="音楽">♪</button>
 
@@ -363,17 +379,17 @@ const PAGES = [
 /* ワーク入力欄：相対座標(0-1)。測定済み */
 const FIELDS = [
   // 問1 横3枠
-  {x:.055,y:.325,w:.245,h:.090,ph:'　'},
-  {x:.315,y:.325,w:.265,h:.090,ph:'　'},
-  {x:.595,y:.325,w:.355,h:.090,ph:'　'},
+  {x:.055,y:.345,w:.245,h:.075,ph:'　'},
+  {x:.315,y:.345,w:.265,h:.075,ph:'　'},
+  {x:.595,y:.345,w:.355,h:.075,ph:'　'},
   // 問2 横3枠
-  {x:.055,y:.480,w:.245,h:.090,ph:'　'},
-  {x:.315,y:.480,w:.265,h:.090,ph:'　'},
-  {x:.595,y:.480,w:.355,h:.090,ph:'　'},
+  {x:.055,y:.500,w:.245,h:.075,ph:'　'},
+  {x:.315,y:.500,w:.265,h:.075,ph:'　'},
+  {x:.595,y:.500,w:.355,h:.075,ph:'　'},
   // 問3 横長
-  {x:.055,y:.635,w:.895,h:.075,ph:'　'},
+  {x:.055,y:.655,w:.895,h:.055,ph:'　'},
   // 問4 横長
-  {x:.055,y:.772,w:.895,h:.080,ph:'　'},
+  {x:.055,y:.792,w:.895,h:.058,ph:'　'},
 ];
 
 const book = document.getElementById('book');
@@ -457,6 +473,7 @@ function show(n){
   document.getElementById('arrNext').classList.toggle('hidden', idx===PAGES.length-1);
   document.getElementById('saveBar').classList.toggle('show', !!PAGES[idx].work);
   document.body.classList.toggle('work-mode', !!PAGES[idx].work);
+  document.getElementById('restartBar').classList.toggle('show', idx===PAGES.length-1);
   // ワークページ中はサイドの透明ナビを無効化（入力欄タップ優先）
   const isWork = !!PAGES[idx].work;
   document.getElementById('navPrev').style.display = isWork ? 'none' : 'block';
@@ -475,6 +492,7 @@ document.getElementById('navNext').onclick = next;
 document.getElementById('navPrev').onclick = prev;
 document.getElementById('workNext').onclick = next;
 document.getElementById('workPrev').onclick = prev;
+document.getElementById('restartBtn').onclick = ()=>{ animating=false; show(0); };
 document.getElementById('arrNext').onclick = next;
 document.getElementById('arrPrev').onclick = prev;
 
